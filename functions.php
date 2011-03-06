@@ -4,11 +4,13 @@ static $submenu_current_item_text=array();
 
 function submenu_get_current_item_text($menu='')
 {
+    global $submenu_current_item_text;
     return $submenu_current_item_text[$menu];
 }
 
 function submenu_get_html($options=array())
 {
+    global $submenu_current_item_text;
     if( !is_array($options) ){
         if( !is_string( $options )){
             $options = '';
@@ -47,9 +49,40 @@ function submenu_get_html($options=array())
 	foreach($nodes as $node){
         $classes = $node->getAttribute('class');
         if( preg_match('#(^|\s)(current\-menu\-item)(\s|$)#', $classes )){
-            $submenu_current_item_text[$options['menu']] = (string)$node->firstChild->nodeValue;
-            $node = $newDoc->importNode($node, true);
-            $newDoc->documentElement->appendChild($node);
+            
+            foreach( $node->childNodes as $a ){
+                if( $a->tagName == 'a' ){
+                    $submenu_current_item_text[$options['menu']] = $a->nodeValue;
+                }
+            }
+            
+            // lets not actually import this, lets grab all the children...
+            $found = false;
+            foreach( $node->childNodes as $child ){
+                
+                if( $child->tagName == 'div'){
+                    foreach( $child->childNodes as $ul){
+                        if( $ul->tagName == 'ul' ){
+                            $child = $ul;
+                            break;
+                        }
+                    }
+                }
+                
+                if( $child->tagName == 'ul'){
+                    foreach( $child->childNodes as $li ){
+                        $found = true;
+                        $li = $newDoc->importNode($li, true);
+                        $newDoc->documentElement->appendChild($li);
+                    }
+                }
+                // $node = $newDoc->importNode($node, true);
+                // $newDoc->documentElement->appendChild($node);
+             
+            }
+            if( !$found ){
+                return '';
+            }
             break;
         }
 	}
