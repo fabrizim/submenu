@@ -2,24 +2,25 @@
 
 class Submenu_Widget extends WP_Widget {
 
-	function Submenu_Widget() {
+	function Submenu_Widget()
+	{
 		$widget_ops = array('classname' => 'widget_submenu', 'description' => __('Submenu Widget'));
 		$control_ops = array('width' => 400, 'height' => 350);
 		$this->WP_Widget('submenu', __('Submenu'), $widget_ops, $control_ops);
 	}
 
-	function widget( $args, $instance ) {
+	function widget( $args, $instance )
+	{
 		extract($args);
-        $menu = submenu_get_html($instance['menu']);
-        $title = $instance['title'];
-        if( $instance['use_item_for_title']) $title = submenu_get_current_item_text($instance['menu']);
+		$menu = submenu_get_html($instance['menu']);
+		$title = $instance['title'];
+		if( $instance['use_item_for_title']) $title = submenu_get_current_item_text($instance['menu']);
         
 		$title = apply_filters( 'widget_title', $title, $instance, $this->id_base);
-		
-        if( empty( $menu ) ) return;
+    if( empty( $menu ) ) return;
 		echo $before_widget;
 		if ( !empty( $title ) ) { echo $before_title . $title . $after_title; } ?>
-			<div class="submenu"><?php echo $menu; ?></div>
+		<div class="submenu"><?php echo $menu; ?></div>
 		<?php
 		echo $after_widget;
 	}

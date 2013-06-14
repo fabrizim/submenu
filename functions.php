@@ -15,79 +15,101 @@ function submenu_get_html($options=array())
         if( !is_string( $options )){
             $options = '';
         }
-        $options = array('menu'=>$options);
+        $options = array('theme_location'=>$options);
     }
     // need to print out the wp_menu_nav for the big buttons
     $options = array_merge(array (
-		'menu'				=> '',
-		'container'			=> 'div',
-		'container_class'	=> 'sub-menu',
-		'menu_class'		=> 'sub-menu-ul',
-		'fallback_cb'		=> 'wp_page_menu',
-		'before'			=> '',
-		'after'				=> '',
-		'link_before'		=> '',
-		'link_after'		=> '',
-		'depth'				=> 0,
-		'walker'			=> '',
-		'echo'				=> false
-	), $options);
+        'menu'                  => '',
+        'container'             => 'div',
+        'container_class'       => 'sub-menu',
+        'menu_class'            => 'sub-menu-ul',
+        'fallback_cb'           => 'wp_page_menu',
+        'before'                => '',
+        'after'                 => '',
+        'link_before'           => '',
+        'link_after'            => '',
+        'depth'                 => 0,
+        'walker'                => '',
+        'echo'                  => false
+    ), $options);
     
     $menu = wp_nav_menu($options);
+		
+		if( !$menu ) return '';
+		
+    $doc = new DOMDocument('1.0', 'utf-8');
+    $doc->loadXML($menu);
+    // funk around with the document
+    $nodes = $doc->getElementsByTagName('li');
+    $active = false;
     
-    $doc = new DOMDocument();
-	$doc->loadHTML($menu);
-    
-    $newDoc = new DOMDocument();
-    $newDoc->formatOutput=true;
-    
-    $newDoc->loadXML('<ul></ul>');
-	
-	// funk around with the document
-	$nodes = $doc->getElementsByTagName('li');
-	
-	foreach($nodes as $node){
-        $classes = $node->getAttribute('class');
-        if( preg_match('#(^|\s)(current\-menu\-item)(\s|$)#', $classes )){
-            
-            foreach( $node->childNodes as $a ){
-                if( $a->tagName == 'a' ){
-                    $submenu_current_item_text[$options['menu']] = $a->nodeValue;
-                }
+    foreach($nodes as $node){
+        if( submenu_has_class( $node, 'current-menu-item' )     ||
+            submenu_has_class( $node, 'current-menu-parent' )   ||
+            submenu_has_class( $node, 'current_page_parent' )
+        ){
+            submenu_add_class( $node, 'is-active-item');
+            foreach( $node->childNodes as $a){
+                if( $a->tagName == 'a') submenu_add_class( $a, 'active-link');
             }
-            
-            // lets not actually import this, lets grab all the children...
-            $found = false;
-            foreach( $node->childNodes as $child ){
-                
-                if( $child->tagName == 'div'){
-                    foreach( $child->childNodes as $ul){
-                        if( $ul->tagName == 'ul' ){
-                            $child = $ul;
-                            break;
-                        }
-                    }
-                }
-                
-                if( $child->tagName == 'ul'){
-                    foreach( $child->childNodes as $li ){
-                        $found = true;
-                        $li = $newDoc->importNode($li, true);
-                        $newDoc->documentElement->appendChild($li);
-                    }
-                }
-                // $node = $newDoc->importNode($node, true);
-                // $newDoc->documentElement->appendChild($node);
-             
-            }
-            if( !$found ){
-                return '';
-            }
+            $active = $node;
             break;
         }
-	}
-	
-	$menu = $newDoc->saveXML();
-	$menu = preg_replace('#^<\?xml.*?\?>#', '', $menu);
+    }
+    if( !$active ){
+        return '';
+    }
+    $parent = $node;
+    while( ($parent = $parent->parentNode) && $parent != $doc ){
+				// wait a minute there hot shot, does this have a sneaky
+				// parent that didnt announce its activeness?
+				if( $parent->tagName == 'li' ){
+						$active = $parent;
+				}
+        submenu_add_class($parent, 'is-active-item');
+    }
+    
+    // delete top level out
+    $ul = $doc->getElementsByTagName('ul')->item(0);
+    $toRemove = array();
+    foreach( $ul->childNodes as $li ){
+        if( !submenu_has_class( $li, 'is-active-item') ){
+            $toRemove[] = $li;
+        }
+    }
+    
+    while( count($toRemove) ){
+        $li = array_pop( $toRemove );
+        foreach( $ul->childNodes as $node ){
+            if( $node === $li ){
+                $ul->removeChild( $node );
+                break;
+            }
+        }
+    }
+    
+    // $menu = $doc->saveXML($doc->documentElement);
+		$menu = $doc->saveXML( $active->getElementsByTagName('ul')->item(0) );
     return $menu;
+}
+
+function submenu_add_class($node, $class){
+    if( !is_a($node, 'DOMElement')) return;
+    if( !submenu_has_class($node, $class) ){
+        $node->setAttribute( 'class', $node->getAttribute('class').' '.$class);
+    }
+}
+
+function submenu_remove_class($node, $class){
+    if( !is_a($node, 'DOMElement')) return;
+    if( submenu_has_class($node, $class) ){
+        $classes = preg_split('/\s+/',$node->getAttribute('class'));
+        $node->setAttribute('class', array_diff( $classes, array($class) ));
+    }
+}
+
+function submenu_has_class($node, $class){
+    if( !is_a($node, 'DOMElement')) return false;
+    $classes = preg_split('/\s+/',$node->getAttribute('class'));
+    return in_array( $class, $classes );
 }
