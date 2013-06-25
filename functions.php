@@ -1,11 +1,18 @@
 <?php
 
-static $submenu_current_item_text=array();
+static $submenu_current_item_text=null;
+static $submenu_current_item_link=null;
 
 function submenu_get_current_item_text($menu='')
 {
     global $submenu_current_item_text;
-    return $submenu_current_item_text[$menu];
+		return $submenu_current_item_text;
+}
+
+function submenu_get_current_item_link($menu='')
+{
+    global $submenu_current_item_link;
+		return $submenu_current_item_link;
 }
 
 function submenu_get_html($options=array())
@@ -32,8 +39,10 @@ function submenu_get_html($options=array())
         'walker'                => '',
         'echo'                  => false
     ), $options);
-    
+		
+		add_filter('nav_menu_css_class', 'submenu_nav_menu_css_class_filter', 10, 2);
     $menu = wp_nav_menu($options);
+		remove_filter('nav_menu_css_class', 'submenu_nav_menu_css_class_filter', 10, 2);
 		
 		if( !$menu ) return '';
 		
@@ -49,7 +58,7 @@ function submenu_get_html($options=array())
             submenu_has_class( $node, 'current_page_parent' )
         ){
             submenu_add_class( $node, 'is-active-item');
-            foreach( $node->childNodes as $a){
+						foreach( $node->childNodes as $a){
                 if( $a->tagName == 'a') submenu_add_class( $a, 'active-link');
             }
             $active = $node;
@@ -60,6 +69,7 @@ function submenu_get_html($options=array())
         return '';
     }
     $parent = $node;
+		$levels = 0;
     while( ($parent = $parent->parentNode) && $parent != $doc ){
 				// wait a minute there hot shot, does this have a sneaky
 				// parent that didnt announce its activeness?
@@ -76,6 +86,14 @@ function submenu_get_html($options=array())
         if( !submenu_has_class( $li, 'is-active-item') ){
             $toRemove[] = $li;
         }
+				else {
+						if( !$li->getElementsByTagName('ul')->length ){
+								return '';
+						}
+						$a = $li->getElementsByTagName('a')->item(0);
+						$submenu_current_item_text = (string)$a->nodeValue;
+						$submenu_current_item_link = $a->getAttribute('href');
+				}
     }
     
     while( count($toRemove) ){
@@ -90,17 +108,42 @@ function submenu_get_html($options=array())
     
     // $menu = $doc->saveXML($doc->documentElement);
 		$menu = $doc->saveXML( $active->getElementsByTagName('ul')->item(0) );
-    return $menu;
+    return apply_filters('submenu_html', $menu);
 }
 
-function submenu_add_class($node, $class){
+function submenu_nav_menu_css_class_filter($classes, $item)
+{
+		
+		if( !is_singular() || in_array( get_post_type(), array('post','page') ) ){
+				return $classes;
+		}
+		if( in_array('current_page_parent', $classes ) ){
+				$classes = array_filter( $classes, 'submenu_remove_current_page_parent');
+		}
+		
+		$archive_link = get_post_type_archive_link( get_post_type() );
+		
+		if( preg_replace('#/$#', '', $archive_link) === preg_replace('#/$#', '', $item->url) ){
+				$classes[] = 'current_page_parent';
+		}
+		return $classes;
+}
+
+function submenu_remove_current_page_parent($cls)
+{
+		return $cls !== 'current_page_parent';
+}
+
+function submenu_add_class($node, $class)
+{
     if( !is_a($node, 'DOMElement')) return;
     if( !submenu_has_class($node, $class) ){
         $node->setAttribute( 'class', $node->getAttribute('class').' '.$class);
     }
 }
 
-function submenu_remove_class($node, $class){
+function submenu_remove_class($node, $class)
+{
     if( !is_a($node, 'DOMElement')) return;
     if( submenu_has_class($node, $class) ){
         $classes = preg_split('/\s+/',$node->getAttribute('class'));
@@ -108,7 +151,8 @@ function submenu_remove_class($node, $class){
     }
 }
 
-function submenu_has_class($node, $class){
+function submenu_has_class($node, $class)
+{
     if( !is_a($node, 'DOMElement')) return false;
     $classes = preg_split('/\s+/',$node->getAttribute('class'));
     return in_array( $class, $classes );

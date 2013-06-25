@@ -17,6 +17,12 @@ class Submenu_Widget extends WP_Widget {
 		if( $instance['use_item_for_title']) $title = submenu_get_current_item_text($instance['menu']);
         
 		$title = apply_filters( 'widget_title', $title, $instance, $this->id_base);
+		if( $instance['use_item_for_title']) {
+			
+			// $link = submenu_get_current_item_link($instance['menu']);
+			// $title = '<a href="'.$link.'">'.$title.'</a>';
+		}
+		
     if( empty( $menu ) ) return;
 		echo $before_widget;
 		if ( !empty( $title ) ) { echo $before_title . $title . $after_title; } ?>
